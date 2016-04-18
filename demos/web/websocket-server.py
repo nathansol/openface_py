@@ -223,7 +223,16 @@ class OpenFaceServerProtocol(WebSocketServerProtocol):
 
     def trainSVM(self):
         print("+ Training SVM on {} labeled images.".format(len(self.images)))
+
         d = self.getData()
+
+        msg = {
+            "type": "TRAINING_PROCESSING",
+            "count": len(self.images),
+            "image_data": json.dumps(d)
+        }
+        self.sendMessage(json.dumps(msg))
+
         if d is None:
             self.svm = None
             return
@@ -252,7 +261,7 @@ class OpenFaceServerProtocol(WebSocketServerProtocol):
         img = Image.open(imgF)
 
         buf = np.fliplr(np.asarray(img))
-        rgbFrame = np.zeros((300, 400, 3), dtype=np.uint8)
+        rgbFrame = np.zeros((400, 400, 3), dtype=np.uint8)
         rgbFrame[:, :, 0] = buf[:, :, 2]
         rgbFrame[:, :, 1] = buf[:, :, 1]
         rgbFrame[:, :, 2] = buf[:, :, 0]
