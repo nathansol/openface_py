@@ -87,6 +87,16 @@ class Face:
         )
 
 
+class SVMData:
+
+    def __init__(self, people, images):
+        self.people = people
+        self.images = images
+
+    def __init__(self, data):
+        self.__dict__ = data
+
+
 # http://stackoverflow.com/questions/3488934/simplejson-and-numpy-array/24375113#24375113
 '''
     Usage:
@@ -136,8 +146,11 @@ class OpenFaceServerProtocol(WebSocketServerProtocol):
         self.training = True
         self.people = []
         self.svm = None
+        self.svm_data_file = 'svm_data'
         if args.unknown:
             self.unknownImgs = np.load("./examples/web/unknown.npy")
+
+        self.loadStateFromFile()
 
     def onConnect(self, request):
         print("Client connecting: {0}".format(request.peer))
@@ -203,6 +216,24 @@ class OpenFaceServerProtocol(WebSocketServerProtocol):
         if not training:
             self.trainSVM()
 
+    def loadStateFromFile(self):
+        try:
+            if os.stat(self.svm_data_file).st_size > 0:
+                with open(self.svm_data_file, 'r') as f:
+                    svm_data = f.read()
+                    data = json.load(svm_data)
+                    svm = SVMData(data)
+                    self.loadState(svm.images, False, svm.people)
+            else:
+               print "Empty SVM Data File"
+        except OSError:
+            print "No SVM Data File or Corrupted"
+
+    def saveStateToFile(self):
+        with open(self.svm_data_file, 'w') as f:
+            d = SVMData(self.people, self.images)
+            f.write(json.dumps(d))
+
     def getData(self):
         X = []
         y = []
@@ -266,14 +297,13 @@ class OpenFaceServerProtocol(WebSocketServerProtocol):
     def trainSVM(self):
         print("+ Training SVM on {} labeled images.".format(len(self.images)))
 
-        d = self.getData()
-
         msg = {
             "type": "TRAINING_PROCESSING",
-            "count": len(self.images),
-            "image_data": json.dumps(d, cls=NumpyEncoder)
+            "count": len(self.images)
         }
         self.sendMessage(json.dumps(msg))
+
+        d = self.getData()
 
         if d is None:
             self.svm = None
@@ -292,6 +322,8 @@ class OpenFaceServerProtocol(WebSocketServerProtocol):
                  'kernel': ['rbf']}
             ]
             self.svm = GridSearchCV(SVC(C=1), param_grid, cv=5).fit(X, y)
+
+            self.saveStateToFile()
 
     def processFrame(self, dataURL, identity):
         head = "data:image/jpeg;base64,"
