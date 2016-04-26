@@ -217,22 +217,39 @@ class OpenFaceServerProtocol(WebSocketServerProtocol):
             self.trainSVM()
 
     def loadStateFromFile(self):
+
+        #todo: serialization isnt working correctly
+        return None
+
         try:
             if os.stat(self.svm_data_file).st_size > 0:
                 with open(self.svm_data_file, 'r') as f:
-                    svm_data = f.read()
-                    data = json.load(svm_data)
-                    svm = SVMData(data)
-                    self.loadState(svm.images, False, svm.people)
+                    print("123")
+                    d = f.read()
+                    j = json.load(d, object_hook=json_numpy_obj_hook)
+                    svm_data = SVMData(j)
+                    print("456")
+                    self.loadState(svm_data.images, False, svm_data.people)
+                    print("Data read from file {} People, {} Images".format(len(svm.people), len(svm.images)))
             else:
                print "Empty SVM Data File"
         except OSError:
             print "No SVM Data File or Corrupted"
 
     def saveStateToFile(self):
-        with open(self.svm_data_file, 'w') as f:
+
+        #todo: serialization isnt working correctly
+        return None
+
+        print("123")
+        with open(self.svm_data_file, 'w+') as f:
+            print("456")
+
+            #todo: serialization isnt working correctly
+
             d = SVMData(self.people, self.images)
-            f.write(json.dumps(d))
+            f.write(json.dumps(d, cls=NumpyEncoder))
+            print("Data written file {} People, {} Images".format(len(self.people), len(self.images)))
 
     def getData(self):
         X = []
@@ -297,6 +314,8 @@ class OpenFaceServerProtocol(WebSocketServerProtocol):
     def trainSVM(self):
         print("+ Training SVM on {} labeled images.".format(len(self.images)))
 
+        self.saveStateToFile()
+
         msg = {
             "type": "TRAINING_PROCESSING",
             "count": len(self.images)
@@ -309,6 +328,7 @@ class OpenFaceServerProtocol(WebSocketServerProtocol):
             self.svm = None
             return
         else:
+            print("123")
             (X, y) = d
             numIdentities = len(set(y + [-1]))
             if numIdentities <= 1:
@@ -321,6 +341,7 @@ class OpenFaceServerProtocol(WebSocketServerProtocol):
                  'gamma': [0.001, 0.0001],
                  'kernel': ['rbf']}
             ]
+            print("hhh456")
             self.svm = GridSearchCV(SVC(C=1), param_grid, cv=5).fit(X, y)
 
             self.saveStateToFile()
